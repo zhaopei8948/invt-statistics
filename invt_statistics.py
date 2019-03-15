@@ -37,7 +37,7 @@ def removeBlank(str):
     if str is None:
         return None
 
-    pattern = re.compile(r'[\\s]')
+    pattern = re.compile(r'[\\s\'\"\\\\/]')
     return re.sub(pattern, '', str)
 
 
