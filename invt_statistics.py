@@ -7,6 +7,8 @@ from loguru import logger
 
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'maintain-invtStatistics'
+
 bp = Blueprint('invtStatistics', __name__, url_prefix='/maintain/statistics', static_folder='static')
 username = os.getenv('ORCL_USERNAME') or 'username'
 password = os.getenv('ORCL_PASSWORD') or 'password'
@@ -59,23 +61,6 @@ def invtStatisticsByDate():
         oldEndDate = removeBlank(oldEndDate)
         endDate = oldEndDate.replace('-', '')
 
-    if int(beginDate) > int(endDate):
-        flash('开始日期不能大于结束日期!')
-        return render_template('invt_statistics.html', invtIn=[], invtOut=[], beginDate=beginTime.strftime('%Y-%m-%d'), endDate=now.strftime('%Y-%m-%d'))
-
-    if int(endDate) - int(beginDate) > 30:
-        flash('不能统计大于一个月的数据!')
-        return render_template('invt_statistics.html', invtIn=[], invtOut=[], beginDate=beginTime.strftime('%Y-%m-%d'), endDate=now.strftime('%Y-%m-%d'))
-
-    sql = '''
-    select decode(grouping(to_char(t.sys_date, 'yyyy-MM-dd')), 1, '小计', to_char(t.sys_date, 'yyyy-MM-dd')), count(1) day_all
-from ceb2_invt_head t
-where t.sys_date >= to_date(:beginDate, 'yyyyMMddHH24')
-and t.sys_date < to_date(:endDate, 'yyyyMMdd')
-and t.app_status in('399', '800', '899')
-group by rollup(to_char(t.sys_date, 'yyyy-MM-dd'))
-order by to_char(t.sys_date, 'yyyy-MM-dd'), day_all desc
-    '''
     try:
         logger.info('beginDate={}, oldBeginDate={}', beginDate, oldBeginDate)
         logger.info('endDate={}, oldEndDate={}', endDate, oldEndDate)
@@ -83,6 +68,25 @@ order by to_char(t.sys_date, 'yyyy-MM-dd'), day_all desc
         endTime = datetime.strptime(endDate, '%Y%m%d')
     except:
         return render_template('invt_statistics.html', invtIn=[], invtOut=[], beginDate=beginTime.strftime('%Y-%m-%d'), endDate=now.strftime('%Y-%m-%d'), message='日期格式不对!')
+
+    if int(beginDate) > int(endDate):
+        msg = '开始日期不能大于结束日期!'
+        return render_template('invt_statistics.html', invtIn=[], invtOut=[], beginDate=beginTime.strftime('%Y-%m-%d'), endDate=now.strftime('%Y-%m-%d'), message=msg)
+
+    logger.info('endTime - beginTime = {} days.', (endTime - beginTime).days)
+    if (endTime - beginTime).days > 30:
+        msg = '不能统计大于一个月的数据!'
+        return render_template('invt_statistics.html', invtIn=[], invtOut=[], beginDate=beginTime.strftime('%Y-%m-%d'), endDate=now.strftime('%Y-%m-%d'), message=msg)
+
+    sql = '''
+    select decode(grouping(to_char(t.sys_date, 'yyyy-MM-dd')), 1, '小计',
+    to_char(t.sys_date, 'yyyy-MM-dd')), count(1) day_all from ceb2_invt_head t
+    where t.sys_date >= to_date(:beginDate, 'yyyyMMddHH24')
+    and t.sys_date < to_date(:endDate, 'yyyyMMdd')
+    and t.app_status in('399', '800', '899')
+    group by rollup(to_char(t.sys_date, 'yyyy-MM-dd'))
+    order by to_char(t.sys_date, 'yyyy-MM-dd'), day_all desc
+    '''
 
     invtInResult = executeSql(sql, beginDate=beginDate + '00', endDate=endDate)
     invtOutResult = executeSql(sql.replace('ceb2', 'ceb3'), beginDate=beginDate + '00', endDate=endDate)
