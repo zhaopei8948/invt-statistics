@@ -26,7 +26,7 @@ def executeSql(sql, **kw):
         cursor.prepare(sql)
         cursor.execute(None, kw)
         result = cursor.fetchall()
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         con.rollback()
     finally:
@@ -50,6 +50,7 @@ def invtStatisticsByDate():
 
     now = datetime.now()
     beginTime = now + timedelta(days=-7)
+    exchrateDate = now.strftime('%Y%m') + '01'
 
     if oldBeginDate is None or oldEndDate is None:
         return render_template('invt_statistics.html', invtIn=[], invtOut=[], beginDate=beginTime.strftime('%Y-%m-%d'), endDate=now.strftime('%Y-%m-%d'))
@@ -80,16 +81,26 @@ def invtStatisticsByDate():
 
     sql = '''
     select decode(grouping(to_char(t.sys_date, 'yyyy-MM-dd')), 1, '小计',
-    to_char(t.sys_date, 'yyyy-MM-dd')), count(1) day_all from ceb2_invt_head t
-    where t.sys_date >= to_date(:beginDate, 'yyyyMMddHH24')
+    to_char(t.sys_date, 'yyyy-MM-dd')), count(1) day_all, sum(t0.total_price) from ceb2_invt_head t
+    inner join (
+        select tt.head_guid, sum(tt1.total_price * tt2.rmb_rate) total_price from ceb2_invt_head tt
+        inner join ceb2_invt_list tt1 on tt1.head_guid = tt.head_guid
+        left outer join exchrate tt2 on tt2.curr_code = tt1.currency
+        and tt2.begin_date = to_date(:exchrateDate, 'yyyyMMdd')
+        where tt.sys_date >= to_date(:innerBeginDate, 'yyyyMMdd')
+        and tt.sys_date < to_date(:innerEndDate, 'yyyyMMdd')
+        and tt.app_status in ('800', '899')
+        group by tt.head_guid
+    ) t0 on t0.head_guid = t.head_guid
+    where t.sys_date >= to_date(:beginDate, 'yyyyMMdd')
     and t.sys_date < to_date(:endDate, 'yyyyMMdd')
-    and t.app_status in('399', '800', '899')
+    and t.app_status in ('800', '899')
     group by rollup(to_char(t.sys_date, 'yyyy-MM-dd'))
     order by to_char(t.sys_date, 'yyyy-MM-dd'), day_all desc
     '''
 
-    invtInResult = executeSql(sql, beginDate=beginDate + '00', endDate=endDate)
-    invtOutResult = executeSql(sql.replace('ceb2', 'ceb3'), beginDate=beginDate + '00', endDate=endDate)
+    invtInResult = executeSql(sql, beginDate=beginDate, endDate=endDate, exchrateDate=exchrateDate, innerBeginDate=beginDate, innerEndDate=endDate)
+    invtOutResult = executeSql(sql.replace('ceb2', 'ceb3'), beginDate=beginDate, endDate=endDate, exchrateDate=exchrateDate, innerBeginDate=beginDate, innerEndDate=endDate)
     return render_template('invt_statistics.html', invtIn=invtInResult, invtOut=invtOutResult, beginDate=beginTime.strftime('%Y-%m-%d'), endDate=endTime.strftime('%Y-%m-%d'))
 
 

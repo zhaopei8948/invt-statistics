@@ -59,6 +59,7 @@
                                 <th scope="col">序号</th>
                                 <th scope="col">日期</th>
                                 <th scope="col">清单数</th>
+                                <th scope="col">货值</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -67,6 +68,7 @@
                                     <th scope="row">{{ loop.index }}</th>
                                     <td>{{ inResult[0] }}</td>
                                     <td>{{ inResult[1] }}</td>
+                                    <td>{{ inResult[2] }}</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
@@ -82,6 +84,7 @@
                                 <th scope="col">序号</th>
                                 <th scope="col">日期</th>
                                 <th scope="col">清单数</th>
+                                <th scope="col">货值</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -90,6 +93,7 @@
                                     <th scope="row">{{ loop.index }}</th>
                                     <td>{{ outResult[0] }}</td>
                                     <td>{{ outResult[1] }}</td>
+                                    <td>{{ outResult[2] }}</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
