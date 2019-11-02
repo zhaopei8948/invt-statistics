@@ -50,7 +50,6 @@ def invtStatisticsByDate():
 
     now = datetime.now()
     beginTime = now + timedelta(days=-7)
-    exchrateDate = now.strftime('%Y%m') + '01'
 
     if oldBeginDate is None or oldEndDate is None:
         return render_template('invt_statistics.html', invtIn=[], invtOut=[], beginDate=beginTime.strftime('%Y-%m-%d'), endDate=now.strftime('%Y-%m-%d'))
@@ -86,7 +85,10 @@ def invtStatisticsByDate():
         select tt.head_guid, sum(tt1.total_price * tt2.rmb_rate) total_price from ceb2_invt_head tt
         inner join ceb2_invt_list tt1 on tt1.head_guid = tt.head_guid
         left outer join exchrate tt2 on tt2.curr_code = tt1.currency
-        and tt2.begin_date = to_date(:exchrateDate, 'yyyyMMdd')
+        inner join (
+              select e.curr_code, max(e.begin_date) max_date from exchrate e group by e.curr_code
+        ) tt3 on tt3.curr_code = tt2.curr_code
+        and tt2.begin_date = tt3.max_date
         where tt.sys_date >= to_date(:innerBeginDate, 'yyyyMMdd')
         and tt.sys_date < to_date(:innerEndDate, 'yyyyMMdd')
         and tt.app_status in ('800', '899')
@@ -99,8 +101,8 @@ def invtStatisticsByDate():
     order by to_char(t.sys_date, 'yyyy-MM-dd'), day_all desc
     '''
 
-    invtInResult = executeSql(sql, beginDate=beginDate, endDate=endDate, exchrateDate=exchrateDate, innerBeginDate=beginDate, innerEndDate=endDate)
-    invtOutResult = executeSql(sql.replace('ceb2', 'ceb3'), beginDate=beginDate, endDate=endDate, exchrateDate=exchrateDate, innerBeginDate=beginDate, innerEndDate=endDate)
+    invtInResult = executeSql(sql, beginDate=beginDate, endDate=endDate, innerBeginDate=beginDate, innerEndDate=endDate)
+    invtOutResult = executeSql(sql.replace('ceb2', 'ceb3'), beginDate=beginDate, endDate=endDate, innerBeginDate=beginDate, innerEndDate=endDate)
     return render_template('invt_statistics.html', invtIn=invtInResult, invtOut=invtOutResult, beginDate=beginTime.strftime('%Y-%m-%d'), endDate=endTime.strftime('%Y-%m-%d'))
 
 
