@@ -65,6 +65,7 @@
                             </tr>
                         </thead>
                         <tbody>
+                        {% if invtIn | length > 0 %}
                             <tr>
                                 <th scope="row">进口</th>
                                 <td>{{ invtIn[0] }}</td>
@@ -73,14 +74,18 @@
                                 <td>{{ invtIn[3] }}</td>
                                 <td>{{ invtIn[4] }}</td>
                             </tr>
+                        {% endif %}
+                        {%  if invtOut | length > 0 %}
                             <tr>
                                 <th scope="row">出口</th>
+
                                 <td>{{ invtOut[0] }}</td>
                                 <td>{{ invtOut[1] }}</td>
                                 <td>{{ invtOut[2] }}</td>
                                 <td>{{ invtOut[3] }}</td>
                                 <td>{{ invtOut[4] }}</td>
                             </tr>
+                        {% endif %}
                         </tbody>
                     </table>
                 </div>
