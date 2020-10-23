@@ -234,4 +234,38 @@ def invtAllStatusStatisticsByDate():
     return render_template('invt_all_status_statistics.html', inAllStatus=inAllStatus, inAllCusStatus=inAllCusStatus, outAllStatus=outAllStatus, outAllCusStatus=outAllCusStatus,
                            beginDate=beginTime.strftime('%Y-%m-%d'), endDate=endTime.strftime('%Y-%m-%d'))
 
+
+@bp.route("/invtCntestStatisticsByTime")
+def invtCntestStatisticsByDate():
+    beginTime = request.values.get('beginTime')
+    endTime = request.values.get('endTime')
+
+    if beginTime is None or endTime is None:
+        return render_template('cn_test_invt_statistics.html', invtIn=[], beginTime='', endTime='')
+
+    beginTime = removeBlank(beginTime)
+    endTime = removeBlank(endTime)
+
+    m = '^[0-9]{2}:[0-9]{2}$'
+    if re.match(m, beginTime) is None or re.match(m, endTime) is None:
+        return render_template('cn_test_invt_statistics.html', invtIn=[], beginTime=beginTime, endTime=endTime,
+                               message='开始时间或者结束时间格式不正确,正确格式为 12:31')
+
+    if int(beginTime.replace(':', '')) > int(endTime.replace(':', '')):
+        return render_template('cn_test_invt_statistics.html', invtIn=[], beginTime=beginTime, endTime=endTime,
+                               message='开始时间不能晚于结束时间')
+
+    sql = '''
+    select to_char(sysdate, 'yyyy-MM-dd'), t.app_status, count(1) from ceb2_invt_head t
+    where t.order_no like 'cntest-%'
+    and t.sys_date >= to_date(to_char(sysdate, 'yyyy-MM-dd') || ' ' || :beginTime, 'yyyy-MM-dd hh24:mi')
+    and t.sys_date < to_date(to_char(sysdate, 'yyyy-MM-dd') || ' ' || :endTime, 'yyyy-MM-dd hh24:mi')
+    group by t.app_status
+    order by count(1) desc
+    '''
+
+    invtInResult = executeSql(sql, beginTime=beginTime, endTime=endTime)
+    return render_template('cn_test_invt_statistics.html', invtIn=invtInResult, beginTime=beginTime, endTime=endTime)
+
+
 app.register_blueprint(bp)
