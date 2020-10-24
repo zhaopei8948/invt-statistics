@@ -236,7 +236,7 @@ def invtAllStatusStatisticsByDate():
 
 
 @bp.route("/invtCntestStatisticsByTime")
-def invtCntestStatisticsByDate():
+def invtCntestStatisticsByTime():
     beginTime = request.values.get('beginTime')
     endTime = request.values.get('endTime')
 
@@ -245,6 +245,12 @@ def invtCntestStatisticsByDate():
 
     beginTime = removeBlank(beginTime)
     endTime = removeBlank(endTime)
+
+    if beginTime == '':
+        beginTime = '00:00'
+
+    if endTime == '':
+        endTime = '23:59'
 
     m = '^[0-9]{2}:[0-9]{2}$'
     if re.match(m, beginTime) is None or re.match(m, endTime) is None:
@@ -256,11 +262,11 @@ def invtCntestStatisticsByDate():
                                message='开始时间不能晚于结束时间')
 
     sql = '''
-    select to_char(sysdate, 'yyyy-MM-dd'), t.app_status, count(1) from ceb2_invt_head t
+    select to_char(sysdate, 'yyyy-MM-dd'), decode(grouping(t.app_status), 1, '合计', t.app_status), count(1) from ceb2_invt_head t
     where t.order_no like 'cntest-%'
     and t.sys_date >= to_date(to_char(sysdate, 'yyyy-MM-dd') || ' ' || :beginTime, 'yyyy-MM-dd hh24:mi')
     and t.sys_date < to_date(to_char(sysdate, 'yyyy-MM-dd') || ' ' || :endTime, 'yyyy-MM-dd hh24:mi')
-    group by t.app_status
+    group by rollup(t.app_status)
     order by count(1) desc
     '''
 
