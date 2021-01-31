@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
+import xlsxwriter
 from flask import (
-    Flask, request, render_template, Blueprint
+    Flask, request, render_template, Blueprint,
+    send_from_directory
 )
 import re, os, traceback, cx_Oracle
 from loguru import logger
@@ -272,6 +274,104 @@ def invtCntestStatisticsByTime():
 
     invtInResult = executeSql(sql, beginTime=beginTime, endTime=endTime)
     return render_template('cn_test_invt_statistics.html', invtIn=invtInResult, beginTime=beginTime, endTime=endTime)
+
+
+@bp.route("/showExportInvtData")
+def showExportInvtData():
+    return render_template('show_export_invt_data.html')
+
+
+@bp.route("/exportExportInvtData")
+def exportExportInvtData():
+    beginDate = request.values.get('beginDate')
+    endDate = request.values.get('endDate')
+    invtStatus = request.values.get('invtStatus')
+    statisticsType = request.values.get('statisticsType')
+    customs = request.values.get('customs')
+
+    sql = '''select t.customs_code 申报代码,
+        {}
+        t.agent_name 申报企业名称, t.ebp_name 电商平台名称, t.owner_name 生产销售单位名称, count(distinct t.head_guid) 总单量,
+        round(sum(t1.total_price * t2.rmb_rate), 2) 货值, sum(t1.qty) 商品申报数量,
+        round(sum(t1.total_price * t2.rmb_rate) / count(distinct t.head_guid), 2) 包裹均价,
+        round(sum(t1.total_price * t2.rmb_rate) / sum(t1.qty), 2) 商品均价
+        from ceb3_invt_head t
+        inner join ceb3_invt_list t1 on t1.head_guid = t.head_guid
+        left outer join (select tt0.* from exchrate tt0 inner join
+            (select ttt0.curr_code, max(ttt0.begin_date) begin_date from exchrate ttt0 group by ttt0.curr_code) tt1
+            on tt1.curr_code = tt0.curr_code and tt1.begin_date = tt0.begin_date) t2 on t2.curr_code = t1.currency
+        where t.customs_code in ({})
+        and t.app_status in ({})
+        and t.sys_date >= to_date(:beginDate, 'yyyy-MM-dd')
+        and t.sys_date < to_date(:endDate, 'yyyy-MM-dd')
+        group by t.customs_code,
+        {}
+        t.agent_name, t.ebp_name, t.owner_name'''
+
+    sysDateGroup = ''
+    customsWhere = ''
+    invtStatusWhere = ''
+    if '1' == statisticsType:
+        sysDateGroup = "to_char(t.sys_date, 'yyyy-MM'), "
+
+    customsArr = customs.split(',')
+    for c in customsArr:
+        customsWhere += "'" + c + "',"
+
+    customsWhere = customsWhere[:-1]
+
+    if '0' == invtStatus:
+        invtStatusWhere = "'800','899'"
+    elif '1' == invtStatus:
+        invtStatusWhere = "'800'"
+    else:
+        invtStatusWhere = "'899'"
+
+    sql = sql.format(sysDateGroup, customsWhere, invtStatusWhere, sysDateGroup)
+
+    invtResult = executeSql(sql, beginDate=beginDate, endDate=endDate)
+
+    print(invtResult)
+
+    now = datetime.now()
+    xlsxDir = "export"
+    fileName = "{}_{}_{}_export_data.xlsx".format(beginDate, endDate, now.strftime('%Y%m%d%H%M%S'))
+    print("fileName is: {}".format(fileName))
+    wb = xlsxwriter.Workbook(os.path.join(xlsxDir, fileName))
+
+    col = 0
+    if '1' == statisticsType:
+        col = 1
+    sht1 = wb.add_worksheet('出口数据调取')
+    sht1.write_string(0, 0, '申报代码')
+    if '1' == statisticsType:
+        sht1.write_string(0, col, '申报年月')
+    sht1.write_string(0, col + 1, '申报企业名称')
+    sht1.write_string(0, col + 2, '电商平台名称')
+    sht1.write_string(0, col + 3, '生产销售单位名称')
+    sht1.write_string(0, col + 4, '总单量')
+    sht1.write_string(0, col + 5, '货值')
+    sht1.write_string(0, col + 6, '商品申报数量')
+    sht1.write_string(0, col + 7, '包裹均价')
+    sht1.write_string(0, col + 8, '商品均价')
+
+    row = 1
+    for invt in invtResult:
+        sht1.write(row, 0, invt[0])
+        if '1' == statisticsType:
+            sht1.write(row, col, invt[col])
+        sht1.write(row, col + 1, invt[col + 1])
+        sht1.write(row, col + 2, invt[col + 2])
+        sht1.write(row, col + 3, invt[col + 3])
+        sht1.write(row, col + 4, invt[col + 4])
+        sht1.write(row, col + 5, invt[col + 5])
+        sht1.write(row, col + 6, invt[col + 6])
+        sht1.write(row, col + 7, invt[col + 7])
+        sht1.write(row, col + 8, invt[col + 8])
+        row += 1
+
+    wb.close()
+    return send_from_directory(xlsxDir, fileName, as_attachment=True)
 
 
 app.register_blueprint(bp)
